@@ -1,25 +1,144 @@
 # CakePHP 3
+<?php
 
-/vendor/*
-/config/app.php
+$products = array(
+    "Product A" => 20,
+    "Product B" => 40,
+    "Product C" => 50
+);
 
-/tmp/cache/models/*
-!/tmp/cache/models/empty
-/tmp/cache/persistent/*
-!/tmp/cache/persistent/empty
-/tmp/cache/views/*
-!/tmp/cache/views/empty
-/tmp/sessions/*
-!/tmp/sessions/empty
-/tmp/tests/*
-!/tmp/tests/empty
+$discountRules = array(
+    "flat_10_discount" => 10,
+    "bulk_5_discount" => 5,
+    "bulk_10_discount" => 10,
+    "tiered_50_discount" => 50
+);
 
-/logs/*
-!/logs/empty
+// Function to calculate the discount amount based on the discount rule
+function calculateDiscount($rule, $quantity, $price)
+{
+    global $discountRules;
+    switch ($rule) {
+        case "flat_10_discount":
+            if ($quantity > 20) {
+                return $discountRules[$rule];
+            }
+            break;
+        case "bulk_5_discount":
+            if ($quantity > 10) {
+                return ($price * $quantity * $discountRules[$rule]) / 100;
+            }
+            break;
+        case "bulk_10_discount":
+            $totalQuantity = array_sum($quantity);
+            if ($totalQuantity > 20) {
+                return ($price * $totalQuantity * $discountRules[$rule]) / 100;
+            }
+            break;
+        case "tiered_50_discount":
+            $totalQuantity = array_sum($quantity);
+            foreach ($quantity as $productQuantity) {
+                if ($totalQuantity > 30 && $productQuantity > 15) {
+                    return ($price * ($productQuantity - 15) * $discountRules[$rule]) / 100;
+                }
+            }
+            break;
+    }
+    return 0;
+}
 
-# CakePHP 2
+// Function to calculate the total cost of the cart
+function calculateCartTotal($cart)
+{
+    global $products;
+    $subtotal = 0;
+    foreach ($cart as $product => $details) {
+        $price = $products[$product];
+        $subtotal += $price * $details['quantity'];
+    }
+    return $subtotal;
+}
 
-/app/tmp/*
-/app/Config/core.php
-/app/Config/database.php
-/vendors/*
+// Function to calculate the shipping fee
+function calculateShippingFee($cart)
+{
+    $totalQuantity = 0;
+    foreach ($cart as $product => $details) {
+        $totalQuantity += $details['quantity'];
+    }
+    return ceil($totalQuantity / 10) * 5;
+}
+
+// Function to calculate the gift wrap fee
+function calculateGiftWrapFee($cart)
+{
+    $totalQuantity = 0;
+    foreach ($cart as $product => $details) {
+        $totalQuantity += $details['quantity'];
+    }
+    return $totalQuantity;
+}
+
+// Function to get the most beneficial discount rule for the cart
+function getBestDiscountRule($cart)
+{
+    global $discountRules;
+    $totalQuantity = 0;
+    $discounts = array();
+    foreach ($cart as $product => $details) {
+        $totalQuantity += $details['quantity'];
+    }
+    foreach ($cart as $product => $details) {
+        foreach ($details['quantity'] as $quantity) {
+            foreach ($discountRules as $rule => $discount) {
+                if ($rule == "tiered_50_discount" && $totalQuantity > 30 && $quantity > 15) {
+                    $discounts[$rule] = $discount;
+                } elseif (($rule == "bulk_5_discount" || $rule == "bulk_10_discount" || $rule == "flat_10_discount") && $quantity > 10) {
+                    $discounts[$rule] = $discount;
+                }
+            }
+        }
+    }
+    arsort($discounts);
+    return key($discounts);
+}
+
+// Main program
+
+$cart = array();
+$quantity = array();
+
+foreach ($products as $product => $price) {
+    echo "Enter the quantity of $product: ";
+    $quantity[$product] = intval(readline());
+    $cart[$product]['quantity'] = $quantity[$product];
+    echo "Is $product wrapped as a gift? (yes/no): ";
+    $giftWrap = readline();
+    $cart[$product]['giftWrap'] = ($giftWrap == 'yes') ? true : false;
+}
+
+$subtotal = calculateCartTotal($cart);
+$discountRule = getBestDiscountRule($cart);
+$discountAmount = calculateDiscount($discountRule, $quantity, $subtotal);
+$shippingFee = calculateShippingFee($cart);
+$giftWrapFee = calculateGiftWrapFee($cart);
+$total = $subtotal - $discountAmount + $shippingFee + $giftWrapFee;
+
+echo "\n---------------------\n";
+foreach ($cart as $product => $details) {
+    echo "Product: $product\n";
+    echo "Quantity: {$details['quantity']}\n";
+    echo "Total Amount: $" . ($products[$product] * $details['quantity']) . "\n";
+    echo "---------------------\n";
+}
+
+echo "Subtotal: $" . $subtotal . "\n";
+echo "Discount Applied: " . ($discountRule ? $discountRule : "No discount") . " (-$" . $discountAmount . ")\n";
+echo "Shipping Fee: $" . $shippingFee . "\n";
+echo "Gift Wrap Fee: $" . $giftWrapFee . "\n";
+echo "---------------------\n";
+echo "Total: $" . $total . "\n";
+
+?>
+
+
